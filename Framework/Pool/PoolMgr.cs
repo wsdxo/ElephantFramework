@@ -20,6 +20,7 @@ public class PoolData
     //获取容器中是否有对象
     public int Count => dataStack.Count;
 
+    //获取是否有正在使用的对象
     public int UsedCount => usedList.Count;
 
     private int maxNum;
@@ -139,7 +140,6 @@ public class PoolMgr : BaseManager<PoolMgr>
     /// 拿东西的方法
     /// </summary>
     /// <param name="name">抽屉容器的名字</param>
-    /// <param name="maxNum">物体数量上限</param>
     /// <returns>从缓存池中取出的对象</returns>
     public GameObject GetObj(string name)
     {
