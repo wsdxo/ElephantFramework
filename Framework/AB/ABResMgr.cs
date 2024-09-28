@@ -7,7 +7,7 @@ using UnityEngine.Events;
 /// </summary>
 public class ABResMgr :BaseManager<ABResMgr>
 {
-    private bool isDebug = true;//如果是true，通过编辑器加载
+    private bool isDebug = false;//如果是true，通过编辑器加载
     private ABResMgr()
     {
 
