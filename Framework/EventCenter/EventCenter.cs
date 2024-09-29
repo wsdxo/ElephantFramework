@@ -23,6 +23,10 @@ public class EventInfo:EventInfoBase
         actions += action;
     }
 }
+/// <summary>
+/// 事件中心管理器
+/// 注意 事件的函数有加就有减
+/// </summary>
 public class EventCenter :BaseManager<EventCenter>
 {
     private Dictionary<E_EventType,EventInfoBase>eventDic = new Dictionary<E_EventType,EventInfoBase>();

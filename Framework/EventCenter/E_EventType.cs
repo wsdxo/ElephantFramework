@@ -16,7 +16,30 @@ public enum E_EventType
     /// 玩家获取奖励
     /// </summary>
     E_Player_GetReward,
+    /// <summary>
+    /// 测试
+    /// </summary>
     E_Test,
+    /// <summary>
+    /// 场景加载
+    /// </summary>
+    E_SceneLoadChange,
+    /// <summary>
+    /// 键盘事件
+    /// </summary>
+    E_Keyboard,
+    /// <summary>
+    /// 鼠标按下
+    /// </summary>
+    E_Mouse,
+    /// <summary>
+    /// 水平热键
+    /// </summary>
+    E_Horizontal,
+    /// <summary>
+    /// 竖直热键
+    /// </summary>
+    E_Vertical,
 }
 
 
