@@ -25,13 +25,17 @@ public enum E_EventType
     /// </summary>
     E_SceneLoadChange,
     /// <summary>
-    /// 键盘事件
+    /// 技能1
     /// </summary>
-    E_Keyboard,
+    E_Skill1,
     /// <summary>
-    /// 鼠标按下
+    /// 技能2
     /// </summary>
-    E_Mouse,
+    E_Skill2,
+    /// <summary>
+    /// 技能3
+    /// </summary>
+    E_Skill3,
     /// <summary>
     /// 水平热键
     /// </summary>

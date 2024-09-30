@@ -1,117 +1,166 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
-
-public class KeyboardInputInfo
-{
-    public KeyCode key;
-    /// <summary>
-    /// 0 按下
-    /// 1 抬起
-    /// 2 按住
-    /// </summary>
-    public int inputType;
-    public KeyboardInputInfo(KeyCode key, int inputType)
-    {
-        this.key = key;
-        this.inputType = inputType;
-    }
-}
-public class MouseInputInfo
-{
-    public int mouseID;
-    /// <summary>
-    /// 0 按下
-    /// 1 抬起
-    /// 2 按住
-    /// </summary>
-    public int inputType;
-    public MouseInputInfo(int mouseID,int inputType)
-    {
-        this.mouseID = mouseID;
-        this.inputType = inputType;
-    }
-}
-
+using UnityEngine.Events;
 public class InputMgr :BaseManager<InputMgr>
 {
-    private bool isKeyboardStart=false;//是否开启输入系统检测
+    private Dictionary<E_EventType,InputInfo>inputDic=new Dictionary<E_EventType,InputInfo>();
 
-    private bool isMouseStart=false;
+    private InputInfo nowInputInfo;//当前遍历时取出的输入信息
+
+    private bool isStart=false;//是否开启输入系统检测
+    //用于在改键时获取输入信息的委托
+    private UnityAction<InputInfo> getInputInfoCallBack;
+
+    private bool isBeginCheckInput=false;//是否开始检测输入信息
+
     private InputMgr()
     {
         MonoMgr.Instance.AddUpdateListener(InputUpdate);
     }
-    public void StartOrCloseInputMgr_Key(bool isStart)
+    public void StartOrCloseInputMgr(bool isStart)
     {
-        this.isKeyboardStart=isStart;
+        this.isStart=isStart;
     }
-    public void StartOrCloseInputMgr_Mouse(bool isStart)
+    /// <summary>
+    /// 键盘改键或初始化的方法
+    /// </summary>
+    /// <param name="key"></param>
+    /// <param name="inputType"></param>
+    public void ChangeKeyboardInfo(E_EventType eventType,KeyCode key,InputInfo.E_InputType inputType)
     {
-        this.isMouseStart=isStart;
+        ///不存在事件 初始化
+        if (!inputDic.ContainsKey(eventType))
+        {
+            inputDic.Add(eventType,new InputInfo(inputType,key));
+        }
+        //改键
+        else
+        {
+            inputDic[eventType].keyOrMouse = InputInfo.E_KeyOrMouse.Key;
+            inputDic[eventType].key = key;
+            inputDic[eventType].inputType = inputType;
+        }
+    }
+    /// <summary>
+    /// 鼠标改键或初始化的方法
+    /// </summary>
+    /// <param name="eventType"></param>
+    /// <param name="mouseID"></param>
+    /// <param name="inputType"></param>
+    public void ChangeMouseInfo(E_EventType eventType,int mouseID,InputInfo.E_InputType inputType)
+    {
+        if(!inputDic.ContainsKey(eventType))
+        {
+            inputDic.Add(eventType, new InputInfo(inputType,mouseID));
+        }
+        else
+        {
+            inputDic[eventType].keyOrMouse = InputInfo.E_KeyOrMouse.Mouse;
+            inputDic[eventType].mouseID = mouseID;
+            inputDic[eventType].inputType = inputType;
+        }
+    }
+    public void RemoveInputInfo(E_EventType eventType)
+    {
+        if(inputDic.ContainsKey(eventType))
+            inputDic.Remove(eventType);
+    }
+    public void GetInputInfo(UnityAction<InputInfo> callBack)
+    {
+        getInputInfoCallBack=callBack;
+        MonoMgr.Instance.StartCoroutine(BeginCheckInput());
+    }
+    private IEnumerator BeginCheckInput()
+    {
+        yield return 0;
+        //等一帧
+        isBeginCheckInput = true;
     }
     private void InputUpdate()
     {
-        //如果没开启，就不要检测
-        if (isKeyboardStart)
+        if(isBeginCheckInput)
         {
-            //控制移动
-            CheckKeyCode(KeyCode.W);
-            CheckKeyCode(KeyCode.A);
-            CheckKeyCode(KeyCode.S);
-            CheckKeyCode(KeyCode.D);
-            //控制攻击
-            CheckKeyCode(KeyCode.J);
-            CheckKeyCode(KeyCode.K);
-            CheckKeyCode(KeyCode.L);
+            if (Input.anyKeyDown)
+            {
+                InputInfo inputInfo = null;
+
+                //监听所有键位的按下
+                Array keyCodes = Enum.GetValues(typeof(KeyCode));
+                //键盘
+                foreach (KeyCode inputKey in keyCodes)
+                {
+                    if (Input.GetKeyDown(inputKey))
+                    {
+                        inputInfo = new InputInfo(InputInfo.E_InputType.Down, inputKey);
+                        break;
+                    }
+                }
+                //鼠标
+                for (int i = 0; i < 3; i++)
+                {
+                    if (Input.GetMouseButtonDown(i))
+                    {
+                        inputInfo = new InputInfo(InputInfo.E_InputType.Down, i);
+                        break;
+                    }
+                }
+                //把获取的信息传递给外部
+                getInputInfoCallBack.Invoke(inputInfo);
+                getInputInfoCallBack = null;
+                isBeginCheckInput = false;//检测一次后就停止
+            }
         }
-        if (isMouseStart)
+        if (!isStart) return;
+
+        foreach(E_EventType eventType in inputDic.Keys)
         {
-            CheckMouse(0);
-            CheckMouse(1);
-            CheckMouse(2);
+            nowInputInfo = inputDic[eventType];
+            //键盘输入
+            if (nowInputInfo.keyOrMouse == InputInfo.E_KeyOrMouse.Key)
+            {
+                switch(nowInputInfo.inputType)
+                {
+                    case InputInfo.E_InputType.Down:
+                        if(Input.GetKeyDown(nowInputInfo.key))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                    case InputInfo.E_InputType.Up:
+                        if (Input.GetKeyUp(nowInputInfo.key))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                    case InputInfo.E_InputType.Always:
+                        if (Input.GetKey(nowInputInfo.key))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                }
+            }
+            //鼠标输入
+            else
+            {
+                switch (nowInputInfo.inputType)
+                {
+                    case InputInfo.E_InputType.Down:
+                        if(Input.GetMouseButtonDown(nowInputInfo.mouseID))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                    case InputInfo.E_InputType.Up:
+                        if (Input.GetMouseButtonUp(nowInputInfo.mouseID))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                    case InputInfo.E_InputType.Always:
+                        if (Input.GetMouseButton(nowInputInfo.mouseID))
+                            EventCenter.Instance.EventTrigger(eventType);
+                        break;
+                }
+            }
         }
 
         EventCenter.Instance.EventTrigger(E_EventType.E_Horizontal, Input.GetAxis("Horizontal"));
 
         EventCenter.Instance.EventTrigger(E_EventType.E_Vertical, Input.GetAxis("Vertical"));
 
-    }
-    private void CheckKeyCode(KeyCode key)
-    {
-        if(Input.GetKeyDown(key))
-        {
-            KeyboardInputInfo info = new KeyboardInputInfo(key,0);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Keyboard,info);
-        }
-        if(Input.GetKeyUp(key))
-        {
-            KeyboardInputInfo info = new KeyboardInputInfo(key, 1);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Keyboard, info);
-        }
-        if (Input.GetKey(key))
-        {
-            KeyboardInputInfo info = new KeyboardInputInfo(key, 2);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Keyboard,info);
-        }
-    }
-    private void CheckMouse(int mouseID)
-    {
-        if (Input.GetMouseButtonDown(mouseID))
-        {
-            MouseInputInfo info = new MouseInputInfo(mouseID, 0);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Mouse, info);
-        }
-        if (Input.GetMouseButtonUp(mouseID))
-        {
-            MouseInputInfo info = new MouseInputInfo(mouseID, 1);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Mouse, info);
-        }
-        if (Input.GetMouseButton(mouseID))
-        {
-            MouseInputInfo info = new MouseInputInfo(mouseID, 2);
-            EventCenter.Instance.EventTrigger(E_EventType.E_Mouse, info);
-        }
     }
 }
