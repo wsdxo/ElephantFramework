@@ -4,6 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 抽屉（池子中的数据）对象
+/// 能够挂载的
 /// </summary>
 public class PoolData
 {
@@ -118,7 +119,26 @@ public class PoolData
         usedList.Add(obj);
     }
 }
+/// <summary>
+/// 方便在字典中用里氏替换原则存储子类对象
+/// </summary>
+public abstract class PoolObjectBase
+{
 
+}
+/// <summary>
+/// 存储数据结构类 逻辑类 (总是就是不继承Mono的) 的抽屉
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class PoolObject<T>:PoolObjectBase where T : class
+{
+    public Queue<T> poolObjs = new Queue<T>();
+}
+
+public interface IPoolObject
+{
+    void ResetInfo();
+}
 /// <summary>
 /// 缓存池(对象池)模块 管理器
 /// </summary>
@@ -127,6 +147,8 @@ public class PoolMgr : BaseManager<PoolMgr>
     //柜子容器当中有抽屉的体现
     //值 其实代表的就是一个 抽屉对象
     private Dictionary<string, PoolData> poolDic = new Dictionary<string, PoolData>();
+
+    private Dictionary<string,PoolObjectBase>poolObjectDic = new Dictionary<string, PoolObjectBase>();
 
     //是否开启布局功能
     public static bool isOpenLayout = true;
@@ -195,7 +217,30 @@ public class PoolMgr : BaseManager<PoolMgr>
         return obj;
     }
 
-
+    public T GetObj<T>(string nameSpace="") where T : class,IPoolObject,new()
+    {
+        string poolName=nameSpace+"_"+typeof(T).Name;
+        //如果存在池子容器
+        if (poolObjectDic.ContainsKey(poolName))
+        {
+            PoolObject<T> pool= poolObjectDic[poolName]as PoolObject<T>;
+            if (pool.poolObjs.Count > 0)
+            {
+                T obj=pool.poolObjs.Dequeue();
+                return obj;
+            }
+            else
+            {
+                T obj=new T();
+                return obj;
+            }
+        }
+        else
+        {
+            T obj = new T();
+            return obj;
+        }
+    }
     /// <summary>
     /// 往缓存池中放入对象
     /// </summary>
@@ -237,6 +282,24 @@ public class PoolMgr : BaseManager<PoolMgr>
         #endregion
     }
 
+    public void PushObj<T>(T obj,string nameSpace="")where T : class,IPoolObject
+    {
+        if (obj == null)
+            return;
+        string poolName=nameSpace +"_"+typeof(T).Name;
+        PoolObject<T> pool;
+        if (poolObjectDic.ContainsKey(poolName))
+        {
+            pool = poolObjectDic[poolName] as PoolObject<T>;
+        }
+        else
+        {
+            pool= new PoolObject<T>();
+            poolObjectDic.Add(poolName, pool);
+        }
+        obj.ResetInfo();
+        pool.poolObjs.Enqueue(obj);
+    }
     /// <summary>
     /// 用于清除整个柜子当中的数据 
     /// 使用场景 主要是 切场景时
@@ -245,5 +308,8 @@ public class PoolMgr : BaseManager<PoolMgr>
     {
         poolDic.Clear();
         poolObj = null;
+
+        poolObjectDic.Clear();
+        poolObjectDic = null;
     }
 }
