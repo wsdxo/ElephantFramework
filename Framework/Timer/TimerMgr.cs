@@ -8,10 +8,18 @@ using UnityEngine.Events;
 /// </summary>
 public class TimerMgr :BaseManager<TimerMgr>
 {
+    /// <summary>
+    /// 存储受Time.Scale影响的计时器
+    /// </summary>
     private Dictionary<int,TimerItem>timerDic= new Dictionary<int,TimerItem>();
+    /// <summary>
+    /// 不受Time.Scale影响的计时器
+    /// </summary>
+    private Dictionary<int, TimerItem> realTimerDic = new Dictionary<int, TimerItem>();
     //待移除列表
     private List<TimerItem>delList= new List<TimerItem>();
     Coroutine timer;
+    Coroutine realTimer;
     //用于创建当前要创建的id
     private int availableID = 0;
     private const float intervalTime = 0.1f;
@@ -22,18 +30,29 @@ public class TimerMgr :BaseManager<TimerMgr>
     //开启计时器管理器
     public void Start()
     {
-        timer=MonoMgr.Instance.StartCoroutine(StartTiming());
+        timer=MonoMgr.Instance.StartCoroutine(StartTiming(false,timerDic));
+        realTimer=MonoMgr.Instance.StartCoroutine(StartTiming(true,realTimerDic));
     }
     //关闭计时器管理器
     public void Stop()
     {
         MonoMgr.Instance.StopCoroutine(timer);
+        MonoMgr.Instance.StopCoroutine(realTimer);
     }
-    private IEnumerator StartTiming()
+    WaitForSeconds waitForSeconds=new WaitForSeconds(intervalTime);
+    WaitForSecondsRealtime waitForSecondsRealtime = new WaitForSecondsRealtime(intervalTime);
+    private IEnumerator StartTiming(bool isRealTime, Dictionary<int, TimerItem> timerDic)
     {
         while(true)
         {
-            yield return new WaitForSeconds(intervalTime);
+            if(isRealTime)
+            {
+                yield return waitForSecondsRealtime;
+            }
+            else
+            {
+                yield return waitForSeconds;
+            }
             foreach(TimerItem item in timerDic.Values)
             {
                 if(!item.isRunning)
@@ -80,7 +99,7 @@ public class TimerMgr :BaseManager<TimerMgr>
     /// <param name="intervalTime">间隔时间</param>
     /// <param name="intervalCallBack">间隔时间结束回调</param>
     /// <returns></returns>
-    public int CreateTimer(int allTime,UnityAction overCallBack,int intervalTime=0,UnityAction intervalCallBack=null)
+    public int CreateTimer(bool isRealTime,int allTime,UnityAction overCallBack,int intervalTime=0,UnityAction intervalCallBack=null)
     {
         //构建唯一id
         int keyID=availableID++;
@@ -89,7 +108,14 @@ public class TimerMgr :BaseManager<TimerMgr>
         //初始化
         timerItem.InitInfo(keyID,allTime,overCallBack,intervalTime,intervalCallBack);
         //记录到字典
-        timerDic.Add(keyID, timerItem);
+        if(isRealTime )
+        {
+            realTimerDic.Add(keyID, timerItem);
+        }
+        else
+        {
+            timerDic.Add(keyID, timerItem);
+        }
         return keyID;
     }
     /// <summary>
@@ -103,6 +129,11 @@ public class TimerMgr :BaseManager<TimerMgr>
             PoolMgr.Instance.PushObj(timerDic[id]);
             timerDic.Remove(id);
         }
+        else if(realTimerDic.ContainsKey(id))
+        {
+            PoolMgr.Instance.PushObj(realTimerDic[id]);
+            realTimerDic.Remove(id);
+        }
     }
     /// <summary>
     /// 重置单个计时器
@@ -113,6 +144,10 @@ public class TimerMgr :BaseManager<TimerMgr>
         if(timerDic.ContainsKey(id))
         {
             timerDic[id].ResetTimer();
+        }
+        else if (realTimerDic.ContainsKey(id))
+        {
+            realTimerDic[id].ResetTimer();
         }
     }
     /// <summary>
@@ -125,6 +160,10 @@ public class TimerMgr :BaseManager<TimerMgr>
         {
             timerDic[id].isRunning = true;
         }
+        else if(realTimerDic.ContainsKey(id))
+        {
+            realTimerDic[id].isRunning = true;
+        }
     }
     /// <summary>
     /// 停止单个计时器
@@ -135,6 +174,10 @@ public class TimerMgr :BaseManager<TimerMgr>
         if (timerDic.ContainsKey(id))
         {
             timerDic[id].isRunning=false;
+        }
+        else if (realTimerDic.ContainsKey(id))
+        {
+            realTimerDic[id].isRunning=false;
         }
     }
 }
